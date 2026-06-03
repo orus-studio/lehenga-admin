@@ -32,6 +32,12 @@ type OrderItem = {
   measurementArmHole?: string | null;
   measurementMori?: string | null;
   measurementNotes?: string | null;
+  lehenga?: {
+    images?: Array<{ id?: string; imageUrl: string; altText?: string | null }>;
+  } | null;
+  jewellery?: {
+    images?: Array<{ id?: string; imageUrl: string; altText?: string | null }>;
+  } | null;
 };
 
 type Order = {
@@ -47,6 +53,7 @@ type Order = {
   totalAmount: string;
   amountPaid?: string;
   amountDueAtPickup?: string;
+  paymentGatewayPaymentId?: string | null;
   depositRefundStatus?: string;
   depositRefundedAmount?: string;
   specialInstructions?: string | null;
@@ -120,6 +127,10 @@ function formatMeasurements(item: Pick<
     item.measurementMori ? `Mori: ${item.measurementMori}` : null,
     item.measurementNotes ? `Notes: ${item.measurementNotes}` : null,
   ].filter((value): value is string => Boolean(value));
+}
+
+function getOrderItemImage(item: OrderItem) {
+  return item.lehenga?.images?.[0] ?? item.jewellery?.images?.[0] ?? null;
 }
 
 export function OrdersManager() {
@@ -359,6 +370,23 @@ export function OrdersManager() {
                   )
                   .join(", ")}
               </p>
+              {order.items.some((item) => getOrderItemImage(item)) ? (
+                <div className="admin-order-image-list">
+                  {order.items.map((item) => {
+                    const image = getOrderItemImage(item);
+
+                    return image ? (
+                      <figure key={item.id} className="admin-order-image-card">
+                        <img src={image.imageUrl} alt={image.altText || item.productNameSnapshot} />
+                        <figcaption>
+                          {item.productNameSnapshot}
+                          {item.sizeLabelSnapshot ? ` (${item.sizeLabelSnapshot})` : ""}
+                        </figcaption>
+                      </figure>
+                    ) : null;
+                  })}
+                </div>
+              ) : null}
               {order.items.some((item) => formatMeasurements(item).length > 0) ? (
                 <div className="admin-order-measurements">
                   <strong>Lehenga details</strong>
@@ -390,8 +418,8 @@ export function OrdersManager() {
               <button type="button" className="admin-secondary-button" onClick={() => openEdit(order)}>
                 Edit
               </button>
-              {order.paymentMethod === "ONLINE" &&
-              order.paymentStatus === "PAID" &&
+              {order.paymentGatewayPaymentId &&
+              (order.paymentStatus === "PAID" || order.paymentStatus === "PARTIALLY_PAID") &&
               order.depositRefundStatus !== "REFUNDED" ? (
                 <button
                   type="button"
