@@ -2,6 +2,8 @@
 
 import { getAdminToken } from "./admin-auth";
 
+import { normalizeCatalogImageUrls } from "./catalog-image-url";
+
 const ADMIN_API_BASE_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_URL?.replace(/\/$/, "") ?? "http://localhost:4000/api";
 
@@ -53,7 +55,7 @@ export async function adminRequest<T>(path: string, options: FetchOptions = {}):
     throw new Error(json?.message ?? "Request failed");
   }
 
-  return (json?.data ?? json) as T;
+  return normalizeCatalogImageUrls((json?.data ?? json) as T);
 }
 
 export type DashboardData = {

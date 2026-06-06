@@ -17,7 +17,7 @@ export function CatalogCard({ title, subtitle, meta, imageUrl, onView, onEdit, o
         {imageUrl ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt={title} />
+            <img src={imageUrl} alt={title} loading="lazy" decoding="async" />
           </>
         ) : (
           <span>{title.slice(0, 1)}</span>
