@@ -99,6 +99,26 @@ export function CategoriesManager() {
     }
   }
 
+  async function toggleFeatured(category: Category) {
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await adminRequest(`/admin/categories/${category.id}`, {
+        method: "PATCH",
+        withAuth: true,
+        body: {
+          isFeatured: !category.isFeatured,
+        },
+      });
+      await loadCategories();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Failed to update category");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="admin-grid-two admin-grid-form">
       <section className="admin-panel">
@@ -161,6 +181,14 @@ export function CategoriesManager() {
                 <span>{category.slug}</span>
               </div>
               <div className="admin-catalog-card-actions">
+                <button
+                  type="button"
+                  className={category.isFeatured ? "admin-primary-button" : "admin-secondary-button"}
+                  onClick={() => toggleFeatured(category)}
+                  disabled={submitting}
+                >
+                  {category.isFeatured ? "Hide from storefront" : "Show on storefront"}
+                </button>
                 <button type="button" className="admin-danger-button" onClick={() => handleDelete(category.id)}>
                   Delete
                 </button>

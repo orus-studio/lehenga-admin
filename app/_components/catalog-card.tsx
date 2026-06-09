@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 type CatalogCardProps = {
   title: string;
   subtitle: string;
@@ -8,9 +10,10 @@ type CatalogCardProps = {
   onView?: () => void;
   onEdit?: () => void;
   onDelete: () => void;
+  extraActions?: ReactNode;
 };
 
-export function CatalogCard({ title, subtitle, meta, imageUrl, onView, onEdit, onDelete }: CatalogCardProps) {
+export function CatalogCard({ title, subtitle, meta, imageUrl, onView, onEdit, onDelete, extraActions }: CatalogCardProps) {
   return (
     <article className="admin-catalog-card">
       <div className="admin-catalog-card-media">
@@ -29,6 +32,7 @@ export function CatalogCard({ title, subtitle, meta, imageUrl, onView, onEdit, o
         <span>{meta}</span>
       </div>
       <div className="admin-catalog-card-actions">
+        {extraActions}
         {onView ? (
           <button type="button" className="admin-secondary-button" onClick={onView}>
             View

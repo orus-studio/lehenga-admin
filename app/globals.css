@@ -481,6 +481,14 @@ img {
   margin-bottom: 18px;
 }
 
+.admin-order-date-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
 .admin-order-editor-row {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr) 100px 160px 160px auto;
@@ -763,6 +771,7 @@ img {
   .admin-catalog-card,
   .admin-size-row,
   .admin-order-grid,
+  .admin-order-date-filters,
   .admin-order-editor-row {
     grid-template-columns: 1fr;
   }

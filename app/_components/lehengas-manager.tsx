@@ -28,6 +28,8 @@ type LehengaItem = {
   minimumRentalDays?: number | null;
   sizes: Array<{ id: string; sizeLabel: string; quantityTotal: number; quantityReserved: number }>;
   images: Array<{ id: string; imageUrl: string; altText?: string | null }>;
+  isFeatured: boolean;
+  isCategoryFeatured: boolean;
 };
 
 export function LehengasManager() {
@@ -186,6 +188,26 @@ export function LehengasManager() {
       await loadData();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Delete failed");
+    }
+  }
+
+  async function updateStorefront(item: LehengaItem, field: "isFeatured" | "isCategoryFeatured") {
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await adminRequest(`/admin/lehengas/${item.id}`, {
+        method: "PATCH",
+        withAuth: true,
+        body: {
+          [field]: !item[field],
+        },
+      });
+      await loadData();
+    } catch (storefrontError) {
+      setError(storefrontError instanceof Error ? storefrontError.message : "Failed to update storefront");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -369,6 +391,27 @@ export function LehengasManager() {
               onView={() => setPreviewItem(item)}
               onEdit={() => openEdit(item)}
               onDelete={() => handleDelete(item.id)}
+              extraActions={
+                <>
+                  <button
+                    type="button"
+                    className={item.isFeatured ? "admin-primary-button" : "admin-secondary-button"}
+                    onClick={() => updateStorefront(item, "isFeatured")}
+                    disabled={submitting}
+                  >
+                    {item.isFeatured ? "Remove from latest" : "Add to latest"}
+                  </button>
+                  <button
+                    type="button"
+                    className={item.isCategoryFeatured ? "admin-primary-button" : "admin-secondary-button"}
+                    onClick={() => updateStorefront(item, "isCategoryFeatured")}
+                    disabled={submitting || !item.category}
+                    title={item.category ? undefined : "Assign a category first"}
+                  >
+                    {item.isCategoryFeatured ? "Remove from category" : "Add to category"}
+                  </button>
+                </>
+              }
             />
           ))}
           {!loading && items.length === 0 ? (

@@ -138,6 +138,8 @@ export function OrdersManager() {
   const [lehengas, setLehengas] = useState<ProductOption[]>([]);
   const [jewellery, setJewellery] = useState<ProductOption[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editForm, setEditForm] = useState({
     rentalStartDate: "",
@@ -150,10 +152,14 @@ export function OrdersManager() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadOrders() {
+  async function loadOrders(dateFilters?: { from?: string; to?: string }) {
     try {
+      const params = new URLSearchParams();
+      if (dateFilters?.from) params.set("createdFrom", dateFilters.from);
+      if (dateFilters?.to) params.set("createdTo", dateFilters.to);
+      const orderPath = `/admin/orders${params.size ? `?${params.toString()}` : ""}`;
       const [ordersData, lehengasData, jewelleryData] = await Promise.all([
-        adminRequest<Order[]>("/admin/orders", { withAuth: true }),
+        adminRequest<Order[]>(orderPath, { withAuth: true }),
         adminRequest<ProductOption[]>("/admin/lehengas", { withAuth: true }),
         adminRequest<ProductOption[]>("/admin/jewellery", { withAuth: true }),
       ]);
@@ -331,6 +337,41 @@ export function OrdersManager() {
           placeholder="Search by order ID, order number, customer, lehenga, jewellery, SKU..."
         />
       </label>
+
+      <div className="admin-order-date-filters">
+        <label className="admin-field">
+          <span>Created from</span>
+          <input type="date" value={createdFrom} onChange={(event) => setCreatedFrom(event.target.value)} />
+        </label>
+        <label className="admin-field">
+          <span>Created to</span>
+          <input
+            type="date"
+            min={createdFrom || undefined}
+            value={createdTo}
+            onChange={(event) => setCreatedTo(event.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className="admin-primary-button"
+          onClick={() => loadOrders({ from: createdFrom, to: createdTo })}
+          disabled={loading || Boolean(createdFrom && createdTo && createdTo < createdFrom)}
+        >
+          Filter orders
+        </button>
+        <button
+          type="button"
+          className="admin-secondary-button"
+          onClick={() => {
+            setCreatedFrom("");
+            setCreatedTo("");
+            void loadOrders();
+          }}
+        >
+          Clear dates
+        </button>
+      </div>
 
       {loading ? <p className="admin-empty-state">Loading orders...</p> : null}
       {error ? <p className="admin-error-banner">{error}</p> : null}
