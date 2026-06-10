@@ -138,8 +138,8 @@ export function OrdersManager() {
   const [lehengas, setLehengas] = useState<ProductOption[]>([]);
   const [jewellery, setJewellery] = useState<ProductOption[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [createdFrom, setCreatedFrom] = useState("");
-  const [createdTo, setCreatedTo] = useState("");
+  const [rentalFrom, setRentalFrom] = useState("");
+  const [rentalTo, setRentalTo] = useState("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editForm, setEditForm] = useState({
     rentalStartDate: "",
@@ -160,8 +160,8 @@ export function OrdersManager() {
 
     try {
       const params = new URLSearchParams();
-      if (dateFilters?.from) params.set("createdFrom", dateFilters.from);
-      if (dateFilters?.to) params.set("createdTo", dateFilters.to);
+      if (dateFilters?.from) params.set("rentalFrom", dateFilters.from);
+      if (dateFilters?.to) params.set("rentalTo", dateFilters.to);
       const orderPath = `/admin/orders${params.size ? `?${params.toString()}` : ""}`;
       const [ordersData, lehengasData, jewelleryData] = await Promise.all([
         adminRequest<Order[]>(orderPath, { withAuth: true }),
@@ -346,32 +346,32 @@ export function OrdersManager() {
 
       <div className="admin-order-date-filters">
         <label className="admin-field">
-          <span>Created from</span>
-          <input type="date" value={createdFrom} onChange={(event) => setCreatedFrom(event.target.value)} />
+          <span>Rental start</span>
+          <input type="date" value={rentalFrom} onChange={(event) => setRentalFrom(event.target.value)} />
         </label>
         <label className="admin-field">
-          <span>Created to</span>
+          <span>Rental end</span>
           <input
             type="date"
-            min={createdFrom || undefined}
-            value={createdTo}
-            onChange={(event) => setCreatedTo(event.target.value)}
+            min={rentalFrom || undefined}
+            value={rentalTo}
+            onChange={(event) => setRentalTo(event.target.value)}
           />
         </label>
         <button
           type="button"
           className="admin-primary-button"
-          onClick={() => loadOrders({ from: createdFrom, to: createdTo }, true)}
-          disabled={loading || filtering || Boolean(createdFrom && createdTo && createdTo < createdFrom)}
+          onClick={() => loadOrders({ from: rentalFrom, to: rentalTo }, true)}
+          disabled={loading || filtering || Boolean(rentalFrom && rentalTo && rentalTo < rentalFrom)}
         >
-          {filtering ? "Filtering..." : "Filter orders"}
+          {filtering ? "Filtering..." : "Check rental dates"}
         </button>
         <button
           type="button"
           className="admin-secondary-button"
           onClick={() => {
-            setCreatedFrom("");
-            setCreatedTo("");
+            setRentalFrom("");
+            setRentalTo("");
             void loadOrders(undefined, true);
           }}
           disabled={loading || filtering}
@@ -383,7 +383,7 @@ export function OrdersManager() {
       {filtering ? (
         <div className="admin-order-filter-loader" role="status" aria-live="polite">
           <span className="admin-spinner" aria-hidden="true" />
-          <span>Loading orders for the selected dates...</span>
+          <span>Checking rental requests that overlap the selected dates...</span>
         </div>
       ) : null}
       {loading ? <p className="admin-empty-state">Loading orders...</p> : null}
@@ -492,7 +492,11 @@ export function OrdersManager() {
 
       {!loading && visibleOrders.length === 0 ? (
         <p className="admin-empty-state">
-          {orders.length === 0 ? "No orders have been created yet." : "No orders matched your search."}
+          {orders.length === 0
+            ? rentalFrom || rentalTo
+              ? "No rental requests overlap the selected dates."
+              : "No orders have been created yet."
+            : "No orders matched your search."}
         </p>
       ) : null}
 
