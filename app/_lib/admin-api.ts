@@ -13,6 +13,19 @@ type FetchOptions = {
   withAuth?: boolean;
 };
 
+const ADMIN_CACHE_TTL_MS = 30 * 1000;
+const adminReadCache = new Map<string, { expiresAt: number; value: unknown }>();
+const adminInflightReads = new Map<string, Promise<unknown>>();
+
+function getRequestCacheKey(path: string, token: string | null) {
+  return `${token ?? "anonymous"}:${path}`;
+}
+
+export function clearAdminRequestCache() {
+  adminReadCache.clear();
+  adminInflightReads.clear();
+}
+
 async function readJson(response: Response) {
   const text = await response.text();
 
@@ -28,12 +41,14 @@ async function readJson(response: Response) {
 }
 
 export async function adminRequest<T>(path: string, options: FetchOptions = {}): Promise<T> {
+  const method = options.method ?? "GET";
   const headers = new Headers({
     "Content-Type": "application/json",
   });
+  let token: string | null = null;
 
   if (options.withAuth) {
-    const token = getAdminToken();
+    token = getAdminToken();
 
     if (!token) {
       throw new Error("Admin token is missing");
@@ -42,20 +57,61 @@ export async function adminRequest<T>(path: string, options: FetchOptions = {}):
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${ADMIN_API_BASE_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-    cache: "no-store",
-  });
+  const cacheKey = getRequestCacheKey(path, token);
 
-  const json = await readJson(response);
+  if (method === "GET") {
+    const cached = adminReadCache.get(cacheKey);
 
-  if (!response.ok) {
-    throw new Error(json?.message ?? "Request failed");
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value as T;
+    }
+
+    const inflight = adminInflightReads.get(cacheKey);
+
+    if (inflight) {
+      return inflight as Promise<T>;
+    }
   }
 
-  return normalizeCatalogImageUrls((json?.data ?? json) as T);
+  const requestPromise = (async () => {
+    const response = await fetch(`${ADMIN_API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      cache: "no-store",
+    });
+
+    const json = await readJson(response);
+
+    if (!response.ok) {
+      throw new Error(json?.message ?? "Request failed");
+    }
+
+    const data = normalizeCatalogImageUrls((json?.data ?? json) as T);
+
+    if (method === "GET") {
+      adminReadCache.set(cacheKey, {
+        expiresAt: Date.now() + ADMIN_CACHE_TTL_MS,
+        value: data,
+      });
+    } else {
+      clearAdminRequestCache();
+    }
+
+    return data;
+  })();
+
+  if (method === "GET") {
+    adminInflightReads.set(cacheKey, requestPromise);
+  }
+
+  try {
+    return await requestPromise;
+  } finally {
+    if (method === "GET") {
+      adminInflightReads.delete(cacheKey);
+    }
+  }
 }
 
 export type DashboardData = {

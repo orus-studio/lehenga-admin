@@ -10,6 +10,7 @@ import { MockImageDropzone, type MockUploadImage } from "./mock-image-dropzone";
 type CategoryOption = {
   id: string;
   name: string;
+  isFeatured: boolean;
 };
 
 type LehengaItem = {
@@ -29,7 +30,6 @@ type LehengaItem = {
   sizes: Array<{ id: string; sizeLabel: string; quantityTotal: number; quantityReserved: number }>;
   images: Array<{ id: string; imageUrl: string; altText?: string | null }>;
   isFeatured: boolean;
-  isCategoryFeatured: boolean;
 };
 
 export function LehengasManager() {
@@ -191,7 +191,7 @@ export function LehengasManager() {
     }
   }
 
-  async function updateStorefront(item: LehengaItem, field: "isFeatured" | "isCategoryFeatured") {
+  async function updateFeaturedCollection(item: LehengaItem, checked: boolean) {
     setSubmitting(true);
     setError(null);
 
@@ -200,9 +200,11 @@ export function LehengasManager() {
         method: "PATCH",
         withAuth: true,
         body: {
-          [field]: !item[field],
+          isFeatured: checked,
         },
       });
+      const nextItem = { ...item, isFeatured: checked };
+      setPreviewItem((current) => (current?.id === item.id ? nextItem : current));
       await loadData();
     } catch (storefrontError) {
       setError(storefrontError instanceof Error ? storefrontError.message : "Failed to update storefront");
@@ -391,27 +393,6 @@ export function LehengasManager() {
               onView={() => setPreviewItem(item)}
               onEdit={() => openEdit(item)}
               onDelete={() => handleDelete(item.id)}
-              extraActions={
-                <>
-                  <button
-                    type="button"
-                    className={item.isFeatured ? "admin-primary-button" : "admin-secondary-button"}
-                    onClick={() => updateStorefront(item, "isFeatured")}
-                    disabled={submitting}
-                  >
-                    {item.isFeatured ? "Remove from latest" : "Add to latest"}
-                  </button>
-                  <button
-                    type="button"
-                    className={item.isCategoryFeatured ? "admin-primary-button" : "admin-secondary-button"}
-                    onClick={() => updateStorefront(item, "isCategoryFeatured")}
-                    disabled={submitting || !item.category}
-                    title={item.category ? undefined : "Assign a category first"}
-                  >
-                    {item.isCategoryFeatured ? "Remove from category" : "Add to category"}
-                  </button>
-                </>
-              }
             />
           ))}
           {!loading && items.length === 0 ? (
@@ -444,6 +425,22 @@ export function LehengasManager() {
               </div>
 
               <div className="admin-preview-copy">
+                <div className="admin-storefront-controls">
+                  <label className="admin-check">
+                    <input
+                      type="checkbox"
+                      checked={previewItem.isFeatured}
+                      disabled={submitting}
+                      onChange={(event) => updateFeaturedCollection(previewItem, event.target.checked)}
+                    />
+                    <span>Add this lehenga to Featured Collection</span>
+                  </label>
+                  <p>
+                    Storefront category sections automatically show the latest four products assigned to each
+                    category enabled on the Categories page.
+                  </p>
+                </div>
+
                 <div className="admin-preview-meta">
                   <strong>SKU</strong>
                   <span>{previewItem.sku}</span>

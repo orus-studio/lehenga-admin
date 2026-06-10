@@ -156,7 +156,7 @@ export function CategoriesManager() {
               checked={form.isFeatured}
               onChange={(event) => setForm((current) => ({ ...current, isFeatured: event.target.checked }))}
             />
-            <span>Feature this category on the storefront</span>
+            <span>Show this category on the storefront</span>
           </label>
 
           {error ? <p className="admin-error-banner admin-field-full">{error}</p> : null}

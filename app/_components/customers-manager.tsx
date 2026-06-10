@@ -29,7 +29,20 @@ type Customer = {
 type ProductOption = {
   id: string;
   name: string;
-  sizes?: Array<{ id: string; sizeLabel: string }>;
+  sku: string;
+  status: string;
+  shortDescription?: string | null;
+  rentalPricePerDay: string;
+  securityDeposit?: string | null;
+  category?: { id: string; name: string } | null;
+  images?: Array<{ id: string; imageUrl: string; altText?: string | null }>;
+  sizes?: Array<{
+    id: string;
+    sizeLabel: string;
+    quantityTotal: number;
+    quantityReserved: number;
+  }>;
+  stockQuantity?: number;
 };
 
 type OrderItemDraft = {
@@ -402,106 +415,153 @@ export function CustomersManager() {
 
               <div className="admin-stack">
                 {orderForm.items.map((item, index) => {
-                  const productOptions = item.itemType === "LEHENGA" ? lehengas : jewellery;
+                  const productOptions = [...(item.itemType === "LEHENGA" ? lehengas : jewellery)].sort((left, right) =>
+                    left.sku.localeCompare(right.sku),
+                  );
+                  const selectedProduct = productOptions.find((product) => product.id === item.productId);
 
                   return (
-                    <div key={`${item.itemType}-${index}`} className="admin-order-editor-row">
-                      <select
-                        value={item.itemType}
-                        onChange={(event) =>
-                          setOrderForm((current) => ({
-                            ...current,
-                            items: current.items.map((entry, entryIndex) =>
-                              entryIndex === index
-                                ? {
-                                    itemType: event.target.value as "LEHENGA" | "JEWELLERY",
-                                    productId: "",
-                                    quantity: "1",
-                                    rentalStartDate: entry.rentalStartDate,
-                                    rentalEndDate: entry.rentalEndDate,
-                                  }
-                                : entry,
-                            ),
-                          }))
-                        }
-                      >
-                        <option value="LEHENGA">Lehenga</option>
-                        <option value="JEWELLERY">Jewellery</option>
-                      </select>
-                      <select
-                        value={item.productId}
-                        onChange={(event) =>
-                          setOrderForm((current) => ({
-                            ...current,
-                            items: current.items.map((entry, entryIndex) =>
-                              entryIndex === index ? { ...entry, productId: event.target.value } : entry,
-                            ),
-                          }))
-                        }
-                        required
-                      >
-                        <option value="">Select product</option>
-                        {productOptions.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(event) =>
-                          setOrderForm((current) => ({
-                            ...current,
-                            items: current.items.map((entry, entryIndex) =>
-                              entryIndex === index ? { ...entry, quantity: event.target.value } : entry,
-                            ),
-                          }))
-                        }
-                      />
-                      <input
-                        type="date"
-                        required
-                        value={item.rentalStartDate}
-                        onChange={(event) =>
-                          setOrderForm((current) => ({
-                            ...current,
-                            items: current.items.map((entry, entryIndex) =>
-                              entryIndex === index ? { ...entry, rentalStartDate: event.target.value } : entry,
-                            ),
-                          }))
-                        }
-                      />
-                      <input
-                        type="date"
-                        required
-                        min={item.rentalStartDate || undefined}
-                        value={item.rentalEndDate}
-                        onChange={(event) =>
-                          setOrderForm((current) => ({
-                            ...current,
-                            items: current.items.map((entry, entryIndex) =>
-                              entryIndex === index ? { ...entry, rentalEndDate: event.target.value } : entry,
-                            ),
-                          }))
-                        }
-                      />
-                      <button
-                        type="button"
-                        className="admin-danger-button"
-                        onClick={() =>
-                          setOrderForm((current) => ({
-                            ...current,
-                            items:
-                              current.items.length === 1
-                                ? current.items
-                                : current.items.filter((_, entryIndex) => entryIndex !== index),
-                          }))
-                        }
-                      >
-                        Remove
-                      </button>
+                    <div key={`${item.itemType}-${index}`} className="admin-order-item-editor">
+                      <div className="admin-order-editor-row">
+                        <select
+                          aria-label="Product type"
+                          value={item.itemType}
+                          onChange={(event) =>
+                            setOrderForm((current) => ({
+                              ...current,
+                              items: current.items.map((entry, entryIndex) =>
+                                entryIndex === index
+                                  ? {
+                                      itemType: event.target.value as "LEHENGA" | "JEWELLERY",
+                                      productId: "",
+                                      quantity: "1",
+                                      rentalStartDate: entry.rentalStartDate,
+                                      rentalEndDate: entry.rentalEndDate,
+                                    }
+                                  : entry,
+                              ),
+                            }))
+                          }
+                        >
+                          <option value="LEHENGA">Lehenga</option>
+                          <option value="JEWELLERY">Jewellery</option>
+                        </select>
+                        <select
+                          aria-label="Select product by SKU"
+                          value={item.productId}
+                          onChange={(event) =>
+                            setOrderForm((current) => ({
+                              ...current,
+                              items: current.items.map((entry, entryIndex) =>
+                                entryIndex === index ? { ...entry, productId: event.target.value } : entry,
+                              ),
+                            }))
+                          }
+                          required
+                        >
+                          <option value="">Select SKU</option>
+                          {productOptions.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.sku} - {product.name}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          aria-label="Quantity"
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(event) =>
+                            setOrderForm((current) => ({
+                              ...current,
+                              items: current.items.map((entry, entryIndex) =>
+                                entryIndex === index ? { ...entry, quantity: event.target.value } : entry,
+                              ),
+                            }))
+                          }
+                        />
+                        <input
+                          aria-label="Rental start date"
+                          type="date"
+                          required
+                          value={item.rentalStartDate}
+                          onChange={(event) =>
+                            setOrderForm((current) => ({
+                              ...current,
+                              items: current.items.map((entry, entryIndex) =>
+                                entryIndex === index ? { ...entry, rentalStartDate: event.target.value } : entry,
+                              ),
+                            }))
+                          }
+                        />
+                        <input
+                          aria-label="Rental end date"
+                          type="date"
+                          required
+                          min={item.rentalStartDate || undefined}
+                          value={item.rentalEndDate}
+                          onChange={(event) =>
+                            setOrderForm((current) => ({
+                              ...current,
+                              items: current.items.map((entry, entryIndex) =>
+                                entryIndex === index ? { ...entry, rentalEndDate: event.target.value } : entry,
+                              ),
+                            }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="admin-danger-button"
+                          onClick={() =>
+                            setOrderForm((current) => ({
+                              ...current,
+                              items:
+                                current.items.length === 1
+                                  ? current.items
+                                  : current.items.filter((_, entryIndex) => entryIndex !== index),
+                            }))
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      {selectedProduct ? (
+                        <article className="admin-order-product-card">
+                          <div className="admin-order-product-image">
+                            {selectedProduct.images?.[0] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={selectedProduct.images[0].imageUrl}
+                                alt={selectedProduct.images[0].altText || selectedProduct.name}
+                              />
+                            ) : (
+                              <span>{selectedProduct.name.slice(0, 1)}</span>
+                            )}
+                          </div>
+                          <div className="admin-order-product-copy">
+                            <div>
+                              <span className="admin-eyebrow">{selectedProduct.sku}</span>
+                              <h4>{selectedProduct.name}</h4>
+                            </div>
+                            <p>{selectedProduct.shortDescription || "No description added."}</p>
+                            <div className="admin-order-product-meta">
+                              <span>Category: {selectedProduct.category?.name ?? "Unassigned"}</span>
+                              <span>Status: {selectedProduct.status}</span>
+                              <span>Rental: Rs {selectedProduct.rentalPricePerDay}/day</span>
+                              <span>Deposit: Rs {selectedProduct.securityDeposit ?? "0"}</span>
+                              <span>
+                                Stock:{" "}
+                                {item.itemType === "LEHENGA"
+                                  ? selectedProduct.sizes
+                                      ?.map((size) => `${size.sizeLabel}: ${size.quantityTotal}`)
+                                      .join(", ") || "No sizes"
+                                  : selectedProduct.stockQuantity ?? 0}
+                              </span>
+                            </div>
+                          </div>
+                        </article>
+                      ) : null}
                     </div>
                   );
                 })}

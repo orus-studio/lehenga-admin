@@ -149,10 +149,15 @@ export function OrdersManager() {
     items: [] as EditItemDraft[],
   });
   const [loading, setLoading] = useState(true);
+  const [filtering, setFiltering] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadOrders(dateFilters?: { from?: string; to?: string }) {
+  async function loadOrders(dateFilters?: { from?: string; to?: string }, showFilterLoader = false) {
+    if (showFilterLoader) {
+      setFiltering(true);
+    }
+
     try {
       const params = new URLSearchParams();
       if (dateFilters?.from) params.set("createdFrom", dateFilters.from);
@@ -172,6 +177,7 @@ export function OrdersManager() {
       setError(loadError instanceof Error ? loadError.message : "Failed to load orders");
     } finally {
       setLoading(false);
+      setFiltering(false);
     }
   }
 
@@ -355,10 +361,10 @@ export function OrdersManager() {
         <button
           type="button"
           className="admin-primary-button"
-          onClick={() => loadOrders({ from: createdFrom, to: createdTo })}
-          disabled={loading || Boolean(createdFrom && createdTo && createdTo < createdFrom)}
+          onClick={() => loadOrders({ from: createdFrom, to: createdTo }, true)}
+          disabled={loading || filtering || Boolean(createdFrom && createdTo && createdTo < createdFrom)}
         >
-          Filter orders
+          {filtering ? "Filtering..." : "Filter orders"}
         </button>
         <button
           type="button"
@@ -366,13 +372,20 @@ export function OrdersManager() {
           onClick={() => {
             setCreatedFrom("");
             setCreatedTo("");
-            void loadOrders();
+            void loadOrders(undefined, true);
           }}
+          disabled={loading || filtering}
         >
           Clear dates
         </button>
       </div>
 
+      {filtering ? (
+        <div className="admin-order-filter-loader" role="status" aria-live="polite">
+          <span className="admin-spinner" aria-hidden="true" />
+          <span>Loading orders for the selected dates...</span>
+        </div>
+      ) : null}
       {loading ? <p className="admin-empty-state">Loading orders...</p> : null}
       {error ? <p className="admin-error-banner">{error}</p> : null}
 
@@ -407,7 +420,7 @@ export function OrdersManager() {
                 {order.items
                   .map(
                     (item) =>
-                      `${item.productNameSnapshot}${item.sizeLabelSnapshot ? ` (${item.sizeLabelSnapshot})` : ""} x${item.quantity} · ${formatDate(item.rentalStartDate)} to ${formatDate(item.rentalEndDate)}`,
+                      `${item.productNameSnapshot} · SKU ${item.skuSnapshot}${item.sizeLabelSnapshot ? ` (${item.sizeLabelSnapshot})` : ""} x${item.quantity} · ${formatDate(item.rentalStartDate)} to ${formatDate(item.rentalEndDate)}`,
                   )
                   .join(", ")}
               </p>
@@ -421,6 +434,7 @@ export function OrdersManager() {
                         <img src={image.imageUrl} alt={image.altText || item.productNameSnapshot} />
                         <figcaption>
                           {item.productNameSnapshot}
+                          {` · SKU ${item.skuSnapshot}`}
                           {item.sizeLabelSnapshot ? ` (${item.sizeLabelSnapshot})` : ""}
                         </figcaption>
                       </figure>
