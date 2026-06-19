@@ -25,6 +25,7 @@ type LehengaItem = {
   occasion?: string | null;
   category?: { id: string; name: string; slug: string } | null;
   rentalPricePerDay: string;
+  discountPercent?: string | null;
   securityDeposit?: string | null;
   minimumRentalDays?: number | null;
   sizes: Array<{ id: string; sizeLabel: string; quantityTotal: number; quantityReserved: number }>;
@@ -51,6 +52,7 @@ export function LehengasManager() {
     fabric: "",
     occasion: "",
     rentalPricePerDay: "",
+    discountPercent: "0",
     securityDeposit: "",
     minimumRentalDays: "1",
     categoryId: "",
@@ -65,6 +67,7 @@ export function LehengasManager() {
     fabric: "",
     occasion: "",
     rentalPricePerDay: "",
+    discountPercent: "0",
     securityDeposit: "",
     minimumRentalDays: "1",
     categoryId: "",
@@ -142,6 +145,7 @@ export function LehengasManager() {
           fabric: form.fabric || undefined,
           occasion: form.occasion || undefined,
           rentalPricePerDay: Number(form.rentalPricePerDay),
+          discountPercent: Number(form.discountPercent || 0),
           securityDeposit: form.securityDeposit ? Number(form.securityDeposit) : undefined,
           minimumRentalDays: Number(form.minimumRentalDays),
           categoryId: form.categoryId || undefined,
@@ -165,6 +169,7 @@ export function LehengasManager() {
         fabric: "",
         occasion: "",
         rentalPricePerDay: "",
+        discountPercent: "0",
         securityDeposit: "",
         minimumRentalDays: "1",
         categoryId: "",
@@ -225,6 +230,7 @@ export function LehengasManager() {
       fabric: item.fabric ?? "",
       occasion: item.occasion ?? "",
       rentalPricePerDay: item.rentalPricePerDay,
+      discountPercent: item.discountPercent ?? "0",
       securityDeposit: item.securityDeposit ?? "",
       minimumRentalDays: String(item.minimumRentalDays ?? 1),
       categoryId: item.category?.id ?? "",
@@ -258,6 +264,7 @@ export function LehengasManager() {
           fabric: editForm.fabric || undefined,
           occasion: editForm.occasion || undefined,
           rentalPricePerDay: Number(editForm.rentalPricePerDay),
+          discountPercent: Number(editForm.discountPercent || 0),
           securityDeposit: editForm.securityDeposit ? Number(editForm.securityDeposit) : undefined,
           minimumRentalDays: Number(editForm.minimumRentalDays),
           categoryId: editForm.categoryId || undefined,
@@ -304,6 +311,16 @@ export function LehengasManager() {
               value={form.rentalPricePerDay}
               onChange={(e) => setForm((c) => ({ ...c, rentalPricePerDay: e.target.value }))}
               required
+            />
+          </label>
+          <label className="admin-field">
+            <span>Discount percent</span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={form.discountPercent}
+              onChange={(e) => setForm((c) => ({ ...c, discountPercent: e.target.value }))}
             />
           </label>
           <label className="admin-field">
@@ -458,6 +475,10 @@ export function LehengasManager() {
                   <span>Rs {previewItem.rentalPricePerDay}</span>
                 </div>
                 <div className="admin-preview-meta">
+                  <strong>Discount</strong>
+                  <span>{Number(previewItem.discountPercent ?? 0)}%</span>
+                </div>
+                <div className="admin-preview-meta">
                   <strong>Security deposit</strong>
                   <span>{previewItem.securityDeposit ? `Rs ${previewItem.securityDeposit}` : "Not set"}</span>
                 </div>
@@ -503,6 +524,10 @@ export function LehengasManager() {
               <label className="admin-field">
                 <span>Rental price per day</span>
                 <input type="number" value={editForm.rentalPricePerDay} onChange={(e) => setEditForm((c) => ({ ...c, rentalPricePerDay: e.target.value }))} required />
+              </label>
+              <label className="admin-field">
+                <span>Discount percent</span>
+                <input type="number" min={0} max={100} value={editForm.discountPercent} onChange={(e) => setEditForm((c) => ({ ...c, discountPercent: e.target.value }))} />
               </label>
               <label className="admin-field">
                 <span>Security deposit</span>

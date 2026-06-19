@@ -141,6 +141,12 @@ export function OrdersManager() {
   const [rentalFrom, setRentalFrom] = useState("");
   const [rentalTo, setRentalTo] = useState("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [statusOrder, setStatusOrder] = useState<Order | null>(null);
+  const [statusForm, setStatusForm] = useState({
+    refundMode: "none" as "none" | "refund",
+    refundAmount: "",
+    refundNotes: "",
+  });
   const [editForm, setEditForm] = useState({
     rentalStartDate: "",
     rentalEndDate: "",
@@ -196,38 +202,40 @@ export function OrdersManager() {
     };
   }, []);
 
-  async function handleFulfilled(orderId: string) {
-    setSubmitting(true);
-    setError(null);
+  function openStatusModal(order: Order) {
+    const securityDeposit = Number(order.securityDeposit || 0);
 
-    try {
-      await adminRequest(`/admin/orders/${orderId}`, {
-        method: "PATCH",
-        withAuth: true,
-        body: {
-          status: "FULFILLED",
-        },
-      });
-      await loadOrders();
-    } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : "Failed to update order");
-    } finally {
-      setSubmitting(false);
-    }
+    setStatusOrder(order);
+    setStatusForm({
+      refundMode: "none",
+      refundAmount: securityDeposit > 0 ? String(securityDeposit) : "",
+      refundNotes: "",
+    });
   }
 
-  async function handleRefundDeposit(orderId: string) {
+  async function handleCompleteOrder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!statusOrder) {
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
     try {
-      await adminRequest(`/admin/orders/${orderId}/refund-deposit`, {
+      await adminRequest(`/admin/orders/${statusOrder.id}/complete`, {
         method: "POST",
         withAuth: true,
+        body: {
+          refundAmount: statusForm.refundMode === "refund" ? Number(statusForm.refundAmount || 0) : 0,
+          refundNotes: statusForm.refundNotes || undefined,
+        },
       });
+      setStatusOrder(null);
       await loadOrders();
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : "Failed to refund deposit");
+      setError(submissionError instanceof Error ? submissionError.message : "Failed to update order status");
     } finally {
       setSubmitting(false);
     }
@@ -328,6 +336,13 @@ export function OrdersManager() {
         return haystack.includes(normalizedSearchQuery);
       })
     : orders;
+  const statusOrderSecurityDeposit = Number(statusOrder?.securityDeposit || 0);
+  const statusOrderRefundAmount = Number(statusForm.refundAmount || 0);
+  const canSubmitStatusUpdate =
+    Boolean(statusOrder) &&
+    statusOrder?.status !== "FULFILLED" &&
+    (statusForm.refundMode === "none" ||
+      (statusOrderRefundAmount > 0 && statusOrderRefundAmount <= statusOrderSecurityDeposit));
 
   return (
     <section className="admin-panel">
@@ -465,26 +480,14 @@ export function OrdersManager() {
               <button
                 type="button"
                 className="admin-primary-button"
-                onClick={() => handleFulfilled(order.id)}
+                onClick={() => openStatusModal(order)}
                 disabled={submitting || order.status === "FULFILLED"}
               >
-                Fulfilled
+                {order.status === "FULFILLED" ? "Fulfilled and locked" : "Update status"}
               </button>
               <button type="button" className="admin-secondary-button" onClick={() => openEdit(order)}>
                 Edit
               </button>
-              {order.paymentGatewayPaymentId &&
-              (order.paymentStatus === "PAID" || order.paymentStatus === "PARTIALLY_PAID") &&
-              order.depositRefundStatus !== "REFUNDED" ? (
-                <button
-                  type="button"
-                  className="admin-ghost-button"
-                  onClick={() => handleRefundDeposit(order.id)}
-                  disabled={submitting}
-                >
-                  Refund fixed deposit
-                </button>
-              ) : null}
             </div>
           </article>
         ))}
@@ -498,6 +501,120 @@ export function OrdersManager() {
               : "No orders have been created yet."
             : "No orders matched your search."}
         </p>
+      ) : null}
+
+      {statusOrder ? (
+        <div className="admin-preview-overlay" role="dialog" aria-modal="true" aria-labelledby="status-order-title">
+          <div className="admin-preview-modal">
+            <div className="admin-panel-heading">
+              <div>
+                <span className="admin-eyebrow">Status update</span>
+                <h3 id="status-order-title">{statusOrder.orderNumber}</h3>
+              </div>
+              <button type="button" className="admin-ghost-button" onClick={() => setStatusOrder(null)}>
+                Close
+              </button>
+            </div>
+
+            <form className="admin-stack" onSubmit={handleCompleteOrder}>
+              <div className="admin-preview-meta">
+                <strong>Fulfillment status</strong>
+                <span>{formatStatusLabel(statusOrder.status)}</span>
+              </div>
+              <div className="admin-preview-meta">
+                <strong>Payment</strong>
+                <span>
+                  {formatStatusLabel(statusOrder.paymentStatus)} · {formatPaymentMethod(statusOrder.paymentMethod)}
+                </span>
+              </div>
+              <div className="admin-preview-meta">
+                <strong>Order total</strong>
+                <span>Rs {statusOrder.totalAmount}</span>
+              </div>
+              <div className="admin-preview-meta">
+                <strong>Security deposit</strong>
+                <span>Rs {statusOrder.securityDeposit}</span>
+              </div>
+              <div className="admin-preview-meta">
+                <strong>Refund status</strong>
+                <span>
+                  {formatStatusLabel(statusOrder.depositRefundStatus)}
+                  {statusOrder.depositRefundedAmount ? ` · Rs ${statusOrder.depositRefundedAmount} refunded` : ""}
+                </span>
+              </div>
+
+              {statusOrder.status === "FULFILLED" ? (
+                <p className="admin-empty-state">This order is fulfilled and locked from further fulfillment changes.</p>
+              ) : statusOrderSecurityDeposit > 0 ? (
+                <div className="admin-stack">
+                  <label className="admin-check">
+                    <input
+                      type="radio"
+                      name="refund-mode"
+                      checked={statusForm.refundMode === "none"}
+                      onChange={() => setStatusForm((current) => ({ ...current, refundMode: "none" }))}
+                    />
+                    <span>Fulfill without refund</span>
+                  </label>
+                  <label className="admin-check">
+                    <input
+                      type="radio"
+                      name="refund-mode"
+                      checked={statusForm.refundMode === "refund"}
+                      onChange={() => setStatusForm((current) => ({ ...current, refundMode: "refund" }))}
+                    />
+                    <span>Refund deposit and fulfill</span>
+                  </label>
+
+                  {statusForm.refundMode === "refund" ? (
+                    <div className="admin-form-grid">
+                      <label className="admin-field">
+                        <span>Refund amount</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={statusOrderSecurityDeposit}
+                          value={statusForm.refundAmount}
+                          onChange={(event) =>
+                            setStatusForm((current) => ({ ...current, refundAmount: event.target.value }))
+                          }
+                          required
+                        />
+                      </label>
+                      <label className="admin-field admin-field-full">
+                        <span>Refund note</span>
+                        <textarea
+                          rows={3}
+                          value={statusForm.refundNotes}
+                          onChange={(event) =>
+                            setStatusForm((current) => ({ ...current, refundNotes: event.target.value }))
+                          }
+                          placeholder="Reason or internal reference"
+                        />
+                      </label>
+                      <p className="admin-empty-state admin-field-full">
+                        Maximum refundable deposit: Rs {statusOrderSecurityDeposit.toLocaleString("en-IN")}
+                        {statusOrder.paymentGatewayPaymentId
+                          ? ". This will be sent to Razorpay."
+                          : ". This will be recorded as a manual refund."}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="admin-empty-state">No security deposit is attached to this order.</p>
+              )}
+
+              <button className="admin-primary-button" type="submit" disabled={submitting || !canSubmitStatusUpdate}>
+                {submitting
+                  ? "Updating status..."
+                  : statusForm.refundMode === "refund"
+                    ? "Refund deposit and fulfill"
+                    : "Mark as fulfilled"}
+              </button>
+            </form>
+          </div>
+        </div>
       ) : null}
 
       {editingOrder ? (

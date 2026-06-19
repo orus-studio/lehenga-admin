@@ -18,6 +18,7 @@ type Customer = {
   lastName?: string | null;
   email?: string | null;
   phone: string;
+  adminVisiblePassword?: string | null;
   notes?: string | null;
   createdAt: string;
   _count: {
@@ -33,6 +34,7 @@ type ProductOption = {
   status: string;
   shortDescription?: string | null;
   rentalPricePerDay: string;
+  discountPercent?: string | null;
   securityDeposit?: string | null;
   category?: { id: string; name: string } | null;
   images?: Array<{ id: string; imageUrl: string; altText?: string | null }>;
@@ -49,14 +51,64 @@ type OrderItemDraft = {
   itemType: "LEHENGA" | "JEWELLERY";
   productId: string;
   quantity: string;
-  rentalStartDate: string;
-  rentalEndDate: string;
+  priceDiscountPerDay: string;
+  measurements: {
+    upper: string;
+    chest: string;
+    waist: string;
+    armHole: string;
+    mori: string;
+    notes: string;
+  };
 };
+
+const emptyMeasurements = {
+  upper: "",
+  chest: "",
+  waist: "",
+  armHole: "",
+  mori: "",
+  notes: "",
+};
+
+const measurementFields: Array<{ key: keyof typeof emptyMeasurements; label: string }> = [
+  { key: "upper", label: "Upper" },
+  { key: "chest", label: "Chest" },
+  { key: "waist", label: "Waist" },
+  { key: "armHole", label: "Arm hole" },
+  { key: "mori", label: "Mori" },
+];
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-IN", {
     dateStyle: "medium",
   }).format(new Date(value));
+}
+
+function getRentalDays(startDate: string, endDate: string) {
+  if (!startDate || !endDate) {
+    return 0;
+  }
+
+  const startTime = new Date(startDate).getTime();
+  const endTime = new Date(endDate).getTime();
+
+  if (Number.isNaN(startTime) || Number.isNaN(endTime) || endTime < startTime) {
+    return 0;
+  }
+
+  return Math.floor((endTime - startTime) / (24 * 60 * 60 * 1000)) + 1;
+}
+
+function getCatalogPricePerDay(product?: ProductOption) {
+  if (!product) {
+    return 0;
+  }
+
+  const rentalPrice = Number(product.rentalPricePerDay || 0);
+  const discountPercent = Number(product.discountPercent || 0);
+
+  return Math.max(0, rentalPrice - rentalPrice * (discountPercent / 100));
 }
 
 export function CustomersManager() {
@@ -69,12 +121,8 @@ export function CustomersManager() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customerForm, setCustomerForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
+    name: "",
     phone: "",
-    password: "",
-    notes: "",
   });
   const [orderForm, setOrderForm] = useState({
     rentalStartDate: "",
@@ -86,8 +134,8 @@ export function CustomersManager() {
         itemType: "LEHENGA",
         productId: "",
         quantity: "1",
-        rentalStartDate: "",
-        rentalEndDate: "",
+        priceDiscountPerDay: "",
+        measurements: { ...emptyMeasurements },
       },
     ] as OrderItemDraft[],
   });
@@ -136,22 +184,14 @@ export function CustomersManager() {
         method: "POST",
         withAuth: true,
         body: {
-          firstName: customerForm.firstName,
-          lastName: customerForm.lastName || undefined,
-          email: customerForm.email,
+          name: customerForm.name,
           phone: customerForm.phone,
-          password: customerForm.password,
-          notes: customerForm.notes || undefined,
         },
       });
 
       setCustomerForm({
-        firstName: "",
-        lastName: "",
-        email: "",
+        name: "",
         phone: "",
-        password: "",
-        notes: "",
       });
       await loadData();
     } catch (submissionError) {
@@ -188,15 +228,19 @@ export function CustomersManager() {
                   itemType: item.itemType,
                   lehengaId: item.productId,
                   quantity: Number(item.quantity || 1),
-                  rentalStartDate: item.rentalStartDate,
-                  rentalEndDate: item.rentalEndDate,
+                  rentalStartDate: orderForm.rentalStartDate,
+                  rentalEndDate: orderForm.rentalEndDate,
+                  priceDiscountPerDay: item.priceDiscountPerDay ? Number(item.priceDiscountPerDay) : undefined,
+                  measurements: Object.fromEntries(
+                    Object.entries(item.measurements).filter(([, value]) => value.trim().length > 0),
+                  ),
                 }
               : {
                   itemType: item.itemType,
                   jewelleryId: item.productId,
                   quantity: Number(item.quantity || 1),
-                  rentalStartDate: item.rentalStartDate,
-                  rentalEndDate: item.rentalEndDate,
+                  rentalStartDate: orderForm.rentalStartDate,
+                  rentalEndDate: orderForm.rentalEndDate,
                 },
           ),
         },
@@ -213,8 +257,8 @@ export function CustomersManager() {
             itemType: "LEHENGA",
             productId: "",
             quantity: "1",
-            rentalStartDate: "",
-            rentalEndDate: "",
+            priceDiscountPerDay: "",
+            measurements: { ...emptyMeasurements },
           },
         ],
       });
@@ -234,27 +278,11 @@ export function CustomersManager() {
         </div>
         <form className="admin-form-grid" onSubmit={handleCreateCustomer}>
           <label className="admin-field">
-            <span>First name</span>
+            <span>Name</span>
             <input
               required
-              value={customerForm.firstName}
-              onChange={(event) => setCustomerForm((current) => ({ ...current, firstName: event.target.value }))}
-            />
-          </label>
-          <label className="admin-field">
-            <span>Last name</span>
-            <input
-              value={customerForm.lastName}
-              onChange={(event) => setCustomerForm((current) => ({ ...current, lastName: event.target.value }))}
-            />
-          </label>
-          <label className="admin-field">
-            <span>Email</span>
-            <input
-              required
-              type="email"
-              value={customerForm.email}
-              onChange={(event) => setCustomerForm((current) => ({ ...current, email: event.target.value }))}
+              value={customerForm.name}
+              onChange={(event) => setCustomerForm((current) => ({ ...current, name: event.target.value }))}
             />
           </label>
           <label className="admin-field">
@@ -265,24 +293,6 @@ export function CustomersManager() {
               onChange={(event) => setCustomerForm((current) => ({ ...current, phone: event.target.value }))}
             />
           </label>
-          <label className="admin-field">
-            <span>Password</span>
-            <input
-              required
-              type="password"
-              value={customerForm.password}
-              onChange={(event) => setCustomerForm((current) => ({ ...current, password: event.target.value }))}
-            />
-          </label>
-          <label className="admin-field admin-field-full">
-            <span>Notes</span>
-            <textarea
-              rows={3}
-              value={customerForm.notes}
-              onChange={(event) => setCustomerForm((current) => ({ ...current, notes: event.target.value }))}
-            />
-          </label>
-
           {error ? <p className="admin-error-banner admin-field-full">{error}</p> : null}
 
           <button className="admin-primary-button admin-field-full" type="submit" disabled={submitting}>
@@ -304,7 +314,7 @@ export function CustomersManager() {
                   <strong>
                     {customer.firstName} {customer.lastName ?? ""}
                   </strong>
-                  <p>{customer.email}</p>
+                  {customer.email ? <p>{customer.email}</p> : null}
                   <a href={`tel:${customer.phone}`}>{customer.phone}</a>
                   <a href={`https://wa.me/${customer.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">
                     WhatsApp
@@ -337,6 +347,7 @@ export function CustomersManager() {
 
               {expandedCustomerId === customer.id ? (
                 <div className="admin-customer-details">
+                  {customer.adminVisiblePassword ? <p>Customer password: {customer.adminVisiblePassword}</p> : null}
                   {customer.notes ? <p>{customer.notes}</p> : <p>No customer notes yet.</p>}
                   <div className="admin-list">
                     {customer.orders.map((order) => (
@@ -385,10 +396,6 @@ export function CustomersManager() {
                       setOrderForm((current) => ({
                         ...current,
                         rentalStartDate: event.target.value,
-                        items: current.items.map((item) => ({
-                          ...item,
-                          rentalStartDate: event.target.value,
-                        })),
                       }))
                     }
                   />
@@ -403,10 +410,6 @@ export function CustomersManager() {
                       setOrderForm((current) => ({
                         ...current,
                         rentalEndDate: event.target.value,
-                        items: current.items.map((item) => ({
-                          ...item,
-                          rentalEndDate: event.target.value,
-                        })),
                       }))
                     }
                   />
@@ -419,6 +422,11 @@ export function CustomersManager() {
                     left.sku.localeCompare(right.sku),
                   );
                   const selectedProduct = productOptions.find((product) => product.id === item.productId);
+                  const rentalDays = getRentalDays(orderForm.rentalStartDate, orderForm.rentalEndDate);
+                  const catalogPricePerDay = getCatalogPricePerDay(selectedProduct);
+                  const orderDiscountPerDay = item.itemType === "LEHENGA" ? Number(item.priceDiscountPerDay || 0) : 0;
+                  const finalPricePerDay = Math.max(0, catalogPricePerDay - orderDiscountPerDay);
+                  const lineTotal = finalPricePerDay * Number(item.quantity || 1) * rentalDays;
 
                   return (
                     <div key={`${item.itemType}-${index}`} className="admin-order-item-editor">
@@ -435,8 +443,8 @@ export function CustomersManager() {
                                       itemType: event.target.value as "LEHENGA" | "JEWELLERY",
                                       productId: "",
                                       quantity: "1",
-                                      rentalStartDate: entry.rentalStartDate,
-                                      rentalEndDate: entry.rentalEndDate,
+                                      priceDiscountPerDay: "",
+                                      measurements: { ...emptyMeasurements },
                                     }
                                   : entry,
                               ),
@@ -480,35 +488,23 @@ export function CustomersManager() {
                             }))
                           }
                         />
-                        <input
-                          aria-label="Rental start date"
-                          type="date"
-                          required
-                          value={item.rentalStartDate}
-                          onChange={(event) =>
-                            setOrderForm((current) => ({
-                              ...current,
-                              items: current.items.map((entry, entryIndex) =>
-                                entryIndex === index ? { ...entry, rentalStartDate: event.target.value } : entry,
-                              ),
-                            }))
-                          }
-                        />
-                        <input
-                          aria-label="Rental end date"
-                          type="date"
-                          required
-                          min={item.rentalStartDate || undefined}
-                          value={item.rentalEndDate}
-                          onChange={(event) =>
-                            setOrderForm((current) => ({
-                              ...current,
-                              items: current.items.map((entry, entryIndex) =>
-                                entryIndex === index ? { ...entry, rentalEndDate: event.target.value } : entry,
-                              ),
-                            }))
-                          }
-                        />
+                        {item.itemType === "LEHENGA" ? (
+                          <input
+                            aria-label="Discount per day"
+                            type="number"
+                            min={0}
+                            placeholder="Discount / day"
+                            value={item.priceDiscountPerDay}
+                            onChange={(event) =>
+                              setOrderForm((current) => ({
+                                ...current,
+                                items: current.items.map((entry, entryIndex) =>
+                                  entryIndex === index ? { ...entry, priceDiscountPerDay: event.target.value } : entry,
+                                ),
+                              }))
+                            }
+                          />
+                        ) : null}
                         <button
                           type="button"
                           className="admin-danger-button"
@@ -525,6 +521,58 @@ export function CustomersManager() {
                           Remove
                         </button>
                       </div>
+
+                      {item.itemType === "LEHENGA" ? (
+                        <div className="admin-form-grid">
+                          {measurementFields.map((field) => (
+                            <label key={field.key} className="admin-field">
+                              <span>{field.label}</span>
+                              <input
+                                value={item.measurements[field.key]}
+                                onChange={(event) =>
+                                  setOrderForm((current) => ({
+                                    ...current,
+                                    items: current.items.map((entry, entryIndex) =>
+                                      entryIndex === index
+                                        ? {
+                                            ...entry,
+                                            measurements: {
+                                              ...entry.measurements,
+                                              [field.key]: event.target.value,
+                                            },
+                                          }
+                                        : entry,
+                                    ),
+                                  }))
+                                }
+                              />
+                            </label>
+                          ))}
+                          <label className="admin-field admin-field-full">
+                            <span>Notes</span>
+                            <textarea
+                              rows={2}
+                              value={item.measurements.notes}
+                              onChange={(event) =>
+                                setOrderForm((current) => ({
+                                  ...current,
+                                  items: current.items.map((entry, entryIndex) =>
+                                    entryIndex === index
+                                      ? {
+                                          ...entry,
+                                          measurements: {
+                                            ...entry.measurements,
+                                            notes: event.target.value,
+                                          },
+                                        }
+                                      : entry,
+                                  ),
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+                      ) : null}
 
                       {selectedProduct ? (
                         <article className="admin-order-product-card">
@@ -548,7 +596,12 @@ export function CustomersManager() {
                             <div className="admin-order-product-meta">
                               <span>Category: {selectedProduct.category?.name ?? "Unassigned"}</span>
                               <span>Status: {selectedProduct.status}</span>
-                              <span>Rental: Rs {selectedProduct.rentalPricePerDay}/day</span>
+                              <span>Rental: Rs {catalogPricePerDay.toLocaleString("en-IN")}/day</span>
+                              {item.itemType === "LEHENGA" && orderDiscountPerDay > 0 ? (
+                                <span>Order discount: Rs {orderDiscountPerDay.toLocaleString("en-IN")}/day</span>
+                              ) : null}
+                              <span>Final: Rs {finalPricePerDay.toLocaleString("en-IN")}/day</span>
+                              <span>Line total: Rs {lineTotal.toLocaleString("en-IN")}</span>
                               <span>Deposit: Rs {selectedProduct.securityDeposit ?? "0"}</span>
                               <span>
                                 Stock:{" "}
@@ -578,8 +631,8 @@ export function CustomersManager() {
                           itemType: "LEHENGA",
                           productId: "",
                           quantity: "1",
-                          rentalStartDate: current.rentalStartDate,
-                          rentalEndDate: current.rentalEndDate,
+                          priceDiscountPerDay: "",
+                          measurements: { ...emptyMeasurements },
                         },
                       ],
                     }))
